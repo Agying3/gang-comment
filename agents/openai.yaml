@@ -1,0 +1,4 @@
+interface:
+  display_name: "GangComment"
+  short_description: "让多个 AI 接力维护代码上下文和决策"
+  default_prompt: "Use $gang-comment to let multiple AI sessions preserve concise rationale, issues, context, and ADR decisions while changing code."
