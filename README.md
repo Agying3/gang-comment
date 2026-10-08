@@ -1,163 +1,175 @@
 # GangComment
 
-让多个 AI 会话接力维护代码上下文、设计理由、问题记录和 ADR。
+AI 换个会话就失忆,这事儿没治吗?有。
 
-GangComment 解决一个常见问题：AI 在当前会话里知道自己为什么这样写，但换一个会话、模型或维护者后，这些上下文就丢了。它要求 AI 把少量、可核验的思考成果写进代码注释，并在后续修改时重新读取、核对和更新。
+这个 skill 让 AI 把"当时为啥这么写"直接撂在代码注释里,下一个人接手的时候不用从零猜。
 
-## 功能
+## 怎么写
 
-- 在代码旁记录实现意图、关键上下文、取舍和未验证点。
-- 用固定标记记录运行中发现的问题，帮助后续 AI 防止回归。
-- 跨会话扫描受影响代码、注释、测试和 ADR，恢复必要背景。
-- 对影响多个模块、共享接口或迁移承诺的决定生成 ADR。
-- 代码变化后同步检查过期注释、问题编号和 ADR 引用。
-
-## 注释格式
-
-问题使用编号，意图使用花括号。两种标记可以单独使用，也可以组合。
+毛病用编号,想法用花括号:
 
 ```python
-# #1「窗口关闭后，后台回调访问已销毁的界面对象会报错」
-# {目标：窗口销毁后丢弃回调；因为界面对象已经不存在；取舍：少显示一次结果，换取不崩溃}
+# #1「窗口关了回调还去摸已经销毁的对象,当场炸」
+# {目标:窗口一销毁就把回调扔了;因为对象都没了;取舍:少显示一次结果,换个不崩}
 ```
-
-```python
-# {目标：复用连接；因为每次重建连接开销更大；待验证：服务端断开后是否需要重新建连}
-```
-
-JavaScript、Go、Rust 等使用语言自己的注释符号：
 
 ```javascript
-// #1「旧请求后返回时会覆盖最新搜索结果」{目标：只接收当前请求的结果；因为旧响应可能晚于新响应到达；取舍：丢弃过期结果}
+// #1「旧请求回来把新的搜索结果盖了」{目标:只认当前请求;因为旧的响应可能更晚到}
 ```
 
-`{意图}` 应包含尽量短的思考摘要，例如：
+`{…}` 里说人话就行:想干啥、为啥这么干、扔了啥、哪儿还没验。
 
-- 想解决什么问题；
-- 为什么选择当前方案；
-- 关键约束和上下文是什么；
-- 放弃了什么替代方案；
-- 哪些地方还没有验证。
+**别吹牛。** 没验过的,别写成"已验证"。
 
-它保存的是设计思考摘要，不是完整的内部思考流水账，也不能把未经验证的猜测写成事实。
+## 改旧注释,得看级别
 
-## 跨会话接力
+新注释随便写,反正是你自己的。**动别人写的,那是另一码事**——改错了没法恢复,而且没有任何测试会跳出来喊你。
 
-新会话开始改代码时，不假设自己记得上次的讨论：
+| 级别 | 啥情况 | AI 咋办 |
+| --- | --- | --- |
+| **L1** | 补本次想法、加新问题编号、修错别字和死链、追加带日期的证据 | 直接改,完事吱一声 |
+| **L2** | 改已有结论、待验证→已验证、删看着可疑的旧注释 | 能改,但先把原文抄下来存档,汇报时点名让你过一眼 |
+| **L3** | 人写的理由、动老编号、安全/合规/许可证、历史事实、ADR 状态、公共 API 契约 | 只给方案,改前改后摆你面前,你点头才动 |
 
-1. 确定本次涉及的文件、功能或问题范围。
-2. 查看工作区状态和当前差异，保护未提交修改。
-3. 搜索 `#1「`、`{目标：`、`{意图：`、`@ADR-`、`TODO`、问题链接和相关测试。
-4. 读取命中的代码上下文、测试和 ADR，重建当前问题、意图、约束、取舍和未验证点。
-5. 把这些线索与当前代码和需求核对，再开始修改。
-6. 修改后同步更新受影响的标记、直接引用和测试。
+三条铁律:
 
-默认只扫描受影响范围。共享接口、跨模块迁移或 ADR 移动/删除时，再扩大搜索范围。
+1. **心里没底就怂一点,往上一级靠。**
+2. **没标记的旧注释,默认是人写的,按 L3 办。** 看标记(`{…}` 或 `#N「」`),不看内容。
+3. **安全和人写的,一票否决。** 哪怕这条是 AI 自己刚写的,照否。
+
+最容易踩的一脚:**"帮我改个错别字" ≠ 授权你动人家写的注释。**
+
+活儿是活儿,授权是授权。L3 的东西,你说"给我改了",AI 也只递方案——除非你明说"这条是人写的,我让你改"。
+
+*为啥这么较真:* 多问一句费不了几个字,把人家的理由悄悄抹了,那才叫事儿大。
+
+细则看 [comment-update-policy.md](references/comment-update-policy.md),汇报长啥样看 [update-report-template.md](references/update-report-template.md)。
+
+## 换会话咋接上
+
+1. 先瞅一眼工作区,别人没提交的改动别给人盖了。
+2. 搜标记:`#N「`、`{…}`、`@ADR-`、`TODO`。
+3. 把命中的代码、测试、ADR 读了。
+4. 拿这些线索跟现在的代码和需求对一遍——**旧注释别盲信**——然后再动手。
 
 ## ADR
 
-当决定影响共享接口、数据格式、存储方案、部署方式、安全边界或迁移承诺，并且重新选择会产生实质成本时，使用 ADR。局部实现细节只需要短注释。
+只有那种"动一次很贵"的决定才值得写 ADR:共享接口、数据格式、存储、部署、安全边界、迁移承诺。局部实现写条短注释就得了,别整虚的。
 
-如果项目已有 ADR 规范，优先遵循项目规范。没有规范时使用 `docs/decisions/NNNN-简短名称.md` 和仓库内的模板。
+项目自己有规矩就听项目的。没有就用 `docs/decisions/NNNN-短名字.md`。
 
-提案阶段使用 `Proposed`，不能因此废止现行决定。只有新决定被接受并明确取代旧决定时，旧记录才标记为 `Superseded`。
+还在讨论就写 `Proposed`,别顺手把现行记录废了;只有新决定被接受、还明说取代旧的,旧的才标 `Superseded`。
 
-## 安装
+## 装
 
-将整个目录放到 Codex 的技能目录：
-
-```text
-%CODEX_HOME%\skills\gang-comment
-```
-
-如果没有设置 `CODEX_HOME`，通常是：
+整个目录拷进去:
 
 ```text
-C:\Users\<用户名>\.codex\skills\gang-comment
+%CODEX_HOME%\skills\gang-comment               # Codex,一般就是 C:\Users\<用户名>\.codex\skills\
+C:\Users\<用户名>\.dsh\skills\gang-comment       # DeepSeek Harness
 ```
 
-安装后，在新会话中使用 `$gang-comment`，或让 Codex 根据任务自动调用该 Skill。
+或者干脆:
 
-## 边界
+```text
+git clone https://github.com/Agying3/gang-comment.git
+```
 
-GangComment 不要求给每一行代码加标签，也不负责后台自动同步。它只在确实有设计理由、运行时问题、约束或长期决策时留下上下文；普通格式化、机械改名和明显的局部修复不应制造额外文档。
+以后 `git pull` 更新。
+
+## 它不干的事
+
+- 不给每行代码贴标签。
+- 不后台自动同步,只管当前这个任务。
+- 格式化、机械改名、明摆着的局部修复,别额外造文档。
+
+分级也不是让 AI 撒手不管。注释长期跟代码对不上,比有依据地改一条更烂。分级只管一件事:**谁确认什么。**
 
 ---
 
 # GangComment
 
-GangComment lets multiple AI sessions hand off and maintain code context, design rationale, issue notes, and ADRs.
+AI forgets everything when the session ends. Sound familiar?
 
-It addresses a common failure mode: one AI session knows why it chose an implementation, but the context disappears when another session, model, or maintainer continues the work. GangComment asks the AI to write a small, verifiable summary of the useful reasoning next to the code, then re-read and validate it during later changes.
+This skill makes the AI dump the "why" straight into code comments, so the next person doesn't start from zero.
 
-## Features
+## How to write them
 
-- Preserve implementation intent, important context, trade-offs, and open questions next to code.
-- Track runtime problems with stable numbered markers to prevent regressions.
-- Restore context across sessions by scanning affected code, comments, tests, and ADRs.
-- Create ADRs for decisions that affect modules, shared interfaces, or migration commitments.
-- Keep comments, issue markers, tests, and ADR references aligned after changes.
-
-## Comment syntax
-
-Use a numbered marker for a known problem and braces for implementation intent. They may be used separately or together.
+Numbers for bugs, braces for intent:
 
 ```python
-# #1「A callback may touch a destroyed UI object after the window closes」
-# {Goal: drop callbacks after destruction; reason: the UI object no longer exists; trade-off: one result may be discarded to avoid a crash}
+# #1「Callback pokes a destroyed object after the window closes, blows up」
+# {Goal: drop callbacks on destroy; reason: the object is gone; trade-off: lose one result, don't crash}
 ```
 
 ```javascript
-// #1「An older response can overwrite the latest search result」{Goal: accept only the current request; reason: stale responses may arrive later; trade-off: discard obsolete results}
+// #1「An old response clobbers the newest search result」{Goal: accept only the current request; reason: stale responses can land later}
 ```
 
-The `{intent}` summary should stay short and may capture:
+Keep `{…}` short and human: what you're doing, why this way, what you dropped, what's still unverified.
 
-- the problem being solved;
-- why the chosen approach was used;
-- important constraints and context;
-- a rejected alternative and its trade-off;
-- an assumption that still needs verification.
+**Don't lie.** Anything unverified must not say "verified".
 
-This is a compact design summary, not a transcript of hidden reasoning. Unverified guesses must be labeled as such.
+## Editing old comments is tiered
 
-## Cross-session handoff
+Write new ones freely — they're yours. **Touching someone else's is a different game** — you can't undo it, and no test will ever scream at you about it.
 
-When a new session starts changing code, it should not assume that it remembers the previous discussion:
+| Tier | Applies to | What the AI does |
+| --- | --- | --- |
+| **L1** | Adding this change's intent, a new issue number, typos, dead links, dated evidence | Just do it, mention it after |
+| **L2** | Changing a conclusion, unverified→verified, deleting a sketchy old comment | Allowed, but copy the original into an archive first and flag it for your review |
+| **L3** | Human-written rationale, old issue numbers, security/compliance/licensing, historical facts, ADR status, public API contracts | Proposal only, before/after laid out; needs your OK |
 
-1. Identify the files, feature, or problem in scope.
-2. Check the working-tree state and current diff.
-3. Search for `#1「`, intent markers, `@ADR-`, `TODO`, issue links, and relevant tests.
-4. Read the matching code context, tests, and ADRs.
-5. Reconcile those clues with the current implementation and requirements.
-6. Update affected markers, direct references, and tests after the change.
+Three hard rules:
 
-Scan the affected scope by default. Expand the search for shared interfaces, cross-module migrations, or moved/deleted ADRs.
+1. **Unsure? Chicken out and go one tier up.**
+2. **An unmarked old comment counts as human-written → L3.** Judge by markers (`{…}` or `#N「」`), not by what it says.
+3. **Security and human-written text veto everything.** Even if the AI wrote that comment itself this session.
+
+The easiest one to trip on: **"fix that typo" is not permission to touch a human-written comment.**
+
+A task is a task. Permission is permission. For L3, even "just change it" only gets you a proposal — unless you say "this one's human-written, I'm letting you edit it."
+
+*Why so picky:* one extra question costs nothing. Quietly erasing someone's reasoning costs a lot.
+
+Full rules: [comment-update-policy.md](references/comment-update-policy.md). Report format: [update-report-template.md](references/update-report-template.md).
+
+## Picking up in a new session
+
+1. Check the working tree first — don't clobber someone's uncommitted work.
+2. Search markers: `#N「`, `{…}`, `@ADR-`, `TODO`.
+3. Read the matching code, tests, and ADRs.
+4. Reconcile it all against the current code and requirements — **don't trust old comments blindly** — then start.
 
 ## ADRs
 
-Use an ADR when a decision affects a shared interface, data format, storage, deployment, security boundary, or migration commitment and changing it later would have a material cost. Local implementation details normally need only a short comment.
+Only write an ADR for decisions that are expensive to reverse: shared interfaces, data formats, storage, deployment, security boundaries, migration commitments. Local details need a one-line comment, not ceremony.
 
-Follow an existing repository convention when one exists. Otherwise use `docs/decisions/NNNN-short-name.md` and the repository template.
+Follow the repo's own convention. Otherwise `docs/decisions/NNNN-short-name.md`.
 
-Use `Proposed` for an unsettled proposal. Do not invalidate the current decision at proposal time. Mark an old record `Superseded` only after a new decision has been accepted and explicitly replaces it.
+Still debating? Write `Proposed` — that doesn't kill the current record. Mark the old one `Superseded` only once a new decision is accepted and explicitly replaces it.
 
-## Installation
+## Install
 
-Copy the complete directory into the Codex skills directory:
-
-```text
-%CODEX_HOME%\skills\gang-comment
-```
-
-When `CODEX_HOME` is not set, this is usually:
+Copy the whole directory in:
 
 ```text
-C:\Users\<username>\.codex\skills\gang-comment
+%CODEX_HOME%\skills\gang-comment               # Codex, usually C:\Users\<user>\.codex\skills\
+C:\Users\<user>\.dsh\skills\gang-comment         # DeepSeek Harness
 ```
 
-After installation, invoke it with `$gang-comment` in a new session, or let Codex select it for a matching task.
+Or just:
 
-## Boundaries
+```text
+git clone https://github.com/Agying3/gang-comment.git
+```
 
-GangComment does not require labels on every line and does not run as a background synchronizer. It adds context only when there is a real design rationale, runtime problem, constraint, or durable decision. Routine formatting, mechanical renames, and obvious local fixes should not create extra documentation.
+Update with `git pull`.
+
+## What it won't do
+
+- Label every line.
+- Sync in the background — current task only.
+- Generate docs for formatting, renames, or obvious local fixes.
+
+Tiering isn't a license to stop maintaining comments either. Leaving one permanently out of sync is worse than editing it defensibly. Tiering decides one thing: **who confirms what.**

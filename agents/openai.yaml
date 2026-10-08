@@ -1,4 +1,4 @@
 interface:
   display_name: "GangComment"
-  short_description: "让多个 AI 接力维护代码上下文和决策"
-  default_prompt: "Use $gang-comment to let multiple AI sessions preserve concise rationale, issues, context, and ADR decisions while changing code."
+  short_description: "让多个 AI 接力维护代码上下文和决策，注释更新按 L1/L2/L3 分级授权"
+  default_prompt: "Use $gang-comment to let multiple AI sessions preserve concise rationale, issues, context, and ADR decisions while changing code. Update existing comments under the L1/L2/L3 tiering policy in references/comment-update-policy.md: apply provable L1 edits, archive and report L2 edits, and only propose L3 edits for human confirmation."
